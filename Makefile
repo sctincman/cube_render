@@ -2,7 +2,9 @@ CXX = g++
 SDL_LIB = -L/usr/lib -lGL -lGLEW -lSDL2 -Wl,-rpath=/usr/lib
 SDL_INCLUDE = -I/usr/include -DGL_GLEXT_PROTOTYPES
 
-CXXFLAGS = -Wall -c -std=c++11 $(SDL_INCLUDE)
+TINY_GLTF_INCLUDE = -Iexternal/tinygltf #-DTINYGLTF_IMPLEMENTATION -DSTB_IMAGE_IMPLEMENTATION -DSTB_IMAGE_WRITE_IMPLEMENTATION
+
+CXXFLAGS = -Wall -c -std=c++11 $(SDL_INCLUDE) $(TINY_GLTF_INCLUDE)
 LDFLAGS = $(SDL_LIB)
 
 SRC := src
@@ -14,7 +16,7 @@ EXE = cube_render
 
 DEBUG ?= 0
 ifeq ($(DEBUG), 1)
-    CXXFLAGS := $(CXXFLAGS) -g
+    CXXFLAGS := $(CXXFLAGS) -g -DCUBE_DEBUG
     EXE := $(EXE)-debug
 endif
 

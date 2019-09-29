@@ -28,6 +28,7 @@ class Camera {
 private:
 	glm::vec3 position;
 	bool targeting;
+	bool persp;
 	glm::vec3 target;
 	glm::vec3 direction;
 	glm::vec3 up;
@@ -48,9 +49,11 @@ private:
 public:
 	Camera(float width, float height, float fov, float znear, float zfar, float scale);
 	glm::mat4 View();
-	glm::mat4 Projection(bool perspective);
+	glm::mat4 Projection();
+	void SetPerspective(bool persp);
 	void Rotate(float delta_x, float delta_y);
 	void Resize(float width, float height);
+	void Reproject();
 	glm::vec3 GetPosition() { return position;}
 	glm::vec3 Move(glm::vec3 delta);
 	void SetPosition(glm::vec3 position);

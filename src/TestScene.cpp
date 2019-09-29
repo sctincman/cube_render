@@ -1,4 +1,4 @@
-#include "Scene.h"
+#include "TestScene.h"
 
 #include <math.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -75,12 +75,12 @@ void main() {\n\
     out_color = color;\n\
 }";
 
-Scene::Scene()
+TestScene::TestScene() : m_t(0)
 {
 	Init();
 }
 
-Scene::~Scene()
+TestScene::~TestScene()
 {
 	glDeleteProgram(m_program);
 	glDeleteBuffers(1, &m_vbo);
@@ -88,8 +88,9 @@ Scene::~Scene()
 	glDeleteVertexArrays(1, &m_vao);
 }
 
-GLResult Scene::Init()
+GLResult TestScene::Init()
 {
+	fprintf(stderr, "TestScene Init\n");
 	GLResult result = GLResult::Success;
 	GLuint vs, fs;
 
@@ -132,17 +133,21 @@ GLResult Scene::Init()
 		     sizeof(indices),
 		     indices,
 		     GL_STATIC_DRAW);
+	
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 	return result;
 }
 
-void Scene::Step(uint32_t stepMs)
+void TestScene::Step(uint32_t stepMs)
 {
 	m_t += static_cast<float>(stepMs) / 400.0;
         m_cubePosition = glm::vec3(sin(m_t), sin(m_t*2.0) + 1.5f, -5.0f);
 }
 
-void Scene::Render(Camera *pCamera)
+void TestScene::Render(Camera *pCamera)
 {
 	GLint world_uniform = glGetUniformLocation(m_program, "world");
 	if (world_uniform == -1) {
@@ -155,7 +160,7 @@ void Scene::Render(Camera *pCamera)
 
 	glm::mat4 model = glm::translate(m_cubePosition);
 	glm::mat4 view = pCamera->View();
-	glm::mat4 model_view_projection = pCamera->Projection(false) * view * model;
+	glm::mat4 model_view_projection = pCamera->Projection() * view * model;
 
 	glClear(GL_COLOR_BUFFER_BIT |
 		GL_DEPTH_BUFFER_BIT);
@@ -171,5 +176,5 @@ void Scene::Render(Camera *pCamera)
 		       36,
 		       GL_UNSIGNED_INT,
 		       nullptr);
-
+	glBindVertexArray(0);
 }

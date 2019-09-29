@@ -4,7 +4,8 @@
 #include <SDL2/SDL.h>
 
 #include "Camera.h"
-#include "Scene.h"
+#include "TestScene.h"
+#include "GltfScene.h"
 #include "CubeRenderer.h"
 #include "log.h"
 
@@ -19,7 +20,8 @@ void CheckSDLError();
 void RunGame();
 void Cleanup();
 
-Scene *scene;
+TestScene *testscene;
+GltfScene *gltfscene;
 CubeRenderer *cube;
 
 bool Init()
@@ -61,7 +63,13 @@ bool Init()
 	SDL_GL_SetSwapInterval(1);
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 
-	scene = new Scene();
+#ifdef CUBE_DEBUG
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(MessageCallback, 0);
+#endif // CUBE_DEBUG
+
+	testscene = new TestScene();
+	gltfscene = new GltfScene("fox.gltf");
 	cube = new CubeRenderer(1024, 768);
 
 	return true;
@@ -131,10 +139,10 @@ void RunGame()
 			}
 		}
 
-		scene->Step(16);
+		testscene->Step(16);
 		cube->Step(16);
 
-		cube->Render(scene);
+		cube->Render(gltfscene);
 
 		SDL_GL_SwapWindow(mainWindow);
 	}
@@ -143,7 +151,8 @@ void RunGame()
 void Cleanup()
 {
 	delete cube;
-	delete scene;
+	delete testscene;
+	delete gltfscene;
 
 	SDL_GL_DeleteContext(mainContext);
 	SDL_DestroyWindow(mainWindow);

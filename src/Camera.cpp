@@ -17,6 +17,8 @@ Camera::Camera(float width, float height, float fov, float znear, float zfar, fl
 	this->znear = znear;
 	this->zfar = zfar;
 	this->scale = scale;
+	this->width = width;
+	this->height = height;
 	perspective = glm::perspective(fov, width/height, znear, zfar);
 	orthographic = glm::ortho(-(width * scale) / height,
 				   (width * scale) / height,
@@ -28,6 +30,8 @@ Camera::Camera(float width, float height, float fov, float znear, float zfar, fl
 	vertical = MoveVertical::Not;
 	horizontal = MoveHorizontal::Not;
 	rotate = RotateZ::Not;
+
+	this->persp = true;
 }
 
 glm::mat4 Camera::View() {
@@ -40,11 +44,16 @@ glm::mat4 Camera::View() {
 	}
 }
 
-glm::mat4 Camera::Projection(bool perspective) {
-	if (perspective)
+glm::mat4 Camera::Projection() {
+	if (this->persp)
 		return this->perspective;
 	else
 		return this->orthographic;
+}
+
+void Camera::SetPerspective(bool persp)
+{
+	this->persp = persp;
 }
 
 bool Camera::HandleKeys(SDL_KeyboardEvent event) {
@@ -143,6 +152,13 @@ bool Camera::HandleKeys(SDL_KeyboardEvent event) {
 			}
 		}
 		break;
+	case SDLK_p:
+		if (event.state == SDL_RELEASED)
+		{
+			this->persp = !this->persp;
+			result = true;
+		}
+		break;
 	default:
 		result = false;
 		break;
@@ -189,6 +205,11 @@ void Camera::Rotate(float delta_x, float delta_y) {
 void Camera::Resize(float width, float height) {
 	this->width = width;
 	this->height = height;
+	Reproject();
+}
+
+void Camera::Reproject()
+{
 	perspective = glm::perspective(fov, width/height, znear, zfar);
 	orthographic = glm::ortho(-(width * scale) / height,
 				   (width * scale) / height,
@@ -223,10 +244,22 @@ void Camera::Step(long delta=16) {
 
 	switch (vertical) {
 	case MoveVertical::Up:
-		position += direction * (delta * 0.01f);
+		if (this->persp)
+			position += direction * (delta * 0.01f);
+		else
+		{
+			scale -= (delta * 0.01f);
+			Reproject();
+		}
 		break;
 	case MoveVertical::Down:
-		position -= direction * (delta * 0.01f);
+		if (this->persp)
+			position -= direction * (delta * 0.01f);
+		else
+		{
+			scale += (delta * 0.01f);
+			Reproject();
+		}
 		break;
 	}
 

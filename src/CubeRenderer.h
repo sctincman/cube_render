@@ -25,6 +25,8 @@ public:
 
 private:
 	GLResult Init();
+	void RenderCube(Scene *pTargetScene);
+	void RenderScene(Scene *pTargetScene);
        
 	// TODO general entities?
 	GLuint m_program;
@@ -38,6 +40,8 @@ private:
 	float m_t;
 	glm::vec3 m_centerPosition;
 	float m_extent;
+
+	bool bRenderCube;
 
 	Camera *pCubeCamera;
 	Camera *pAppCamera;

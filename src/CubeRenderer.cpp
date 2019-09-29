@@ -115,7 +115,7 @@ CubeRenderer::CubeRenderer(uint32_t width, uint32_t height)
 {
 	m_width = width;
 	m_height = height;
-	this->persp = true;
+	this->bRenderCube = true;
 	Init();
 }
 
@@ -416,6 +416,7 @@ GLResult CubeRenderer::Init()
 				 2.0);
 
 	pCubeCamera->Move(glm::vec3(0.0, 1.5, 0.0));
+	pCubeCamera->SetPerspective(false);
 
 	pAppCamera = new Camera(static_cast<float>(m_width),
 				static_cast<float>(m_height),
@@ -442,12 +443,9 @@ void CubeRenderer::Step(uint32_t stepMs)
 static glm::vec3 up1 = glm::vec3(0.0f, 1.0f, 0.0f);
 static glm::vec3 up2 = glm::vec3(0.0f, 0.0f, 1.0f);
 
-void CubeRenderer::Render(Scene *pTargetScene)
+void CubeRenderer::RenderCube(Scene *pTargetScene)
 {
-	// render scene with cameras
-	// for each camera
-	// bind fbo
-	// render scene with camera
+
 	for (uint8_t i=0; i < NUM_SIDES; ++i)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, m_fbos[i]);
@@ -488,7 +486,6 @@ void CubeRenderer::Render(Scene *pTargetScene)
 		pTargetScene->Render(pCubeCamera);
 	}
 
-	//fprintf(stderr, "bah1 %x\n", glGetError());
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	// resize...
@@ -500,14 +497,12 @@ void CubeRenderer::Render(Scene *pTargetScene)
 	}
 
 	glClearColor(0.2, 0.3, 0.2, 1.0);
-	glDisable(GL_DEPTH_TEST);
-	glCullFace(GL_NONE);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_DEPTH_TEST);
+	glCullFace(GL_BACK);
 
 	glm::mat4 model = glm::translate(glm::vec3(0.0, 1.5, -5.0));
 	glm::mat4 view = pAppCamera->View();
-	glm::mat4 model_view_projection = pAppCamera->Projection(this->persp) * view * model;
+	glm::mat4 model_view_projection = pAppCamera->Projection() * view * model;
 
 	glClear(GL_COLOR_BUFFER_BIT |
 		GL_DEPTH_BUFFER_BIT);
@@ -527,20 +522,40 @@ void CubeRenderer::Render(Scene *pTargetScene)
 		       36,
 		       GL_UNSIGNED_INT,
 		       nullptr);
+	glBindVertexArray(0);
+}
 
-	//fprintf(stderr, "bah2 %x\n", glGetError());
+void CubeRenderer::RenderScene(Scene *pTargetScene)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// resize...
+	glViewport(0,0,m_width,m_height);
+        pTargetScene->Render(pAppCamera);
+}
+
+void CubeRenderer::Render(Scene *pTargetScene)
+{
+	if (bRenderCube != false)
+		RenderCube(pTargetScene);
+	else
+		RenderScene(pTargetScene);
 }
 
 bool CubeRenderer::HandleInputEvent(SDL_Event event)
 {
 	bool result = false;
-	if (event.type == SDL_KEYUP &&
-	    event.key.keysym.sym == SDLK_p)
+	if (event.type == SDL_KEYUP)
 	{
-		this->persp = !this->persp;
-		result = true;
+		switch (event.key.keysym.sym)
+		{
+		case SDLK_v:
+			this->bRenderCube = !this->bRenderCube;
+			result = true;
+			break;
+		}
 	}
-	else
+
+	if (result == false)
 		result = pAppCamera->HandleInputEvent(event);
 
 	return result;
