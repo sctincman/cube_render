@@ -35,9 +35,11 @@ static const char fs_src[] =
 "#version 330\n\
 in vec4 color;\n\
 in vec2 texcoord;\n\
+uniform vec4 color_factor;\n\
+uniform sampler2D color_texture;\n\
 out vec4 out_color;\n\
 void main() {\n\
-    out_color = color;\n\
+    out_color = color + texture(color_texture, texcoord);\n\
 }";
 
 
@@ -58,6 +60,7 @@ public:
 private:
 	GLResult Init(const char* pFileName);
 	void DrawMesh(const tinygltf::Mesh* mesh, glm::mat4 transform);
+	void DrawNode(tinygltf::Node* node, glm::mat4 parent_transform);
 
 	tinygltf::Model m_model;
 	
@@ -67,6 +70,7 @@ private:
 
 	// per mesh
 	std::vector<GLBufferState> m_glBuffers;
+	std::vector<GLuint> m_textures;
 };
 
 #endif // CUBE_GLTFSCENE_H

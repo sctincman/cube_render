@@ -31,6 +31,11 @@ GltfScene::~GltfScene()
 		GLBufferState* state = &m_glBuffers[i];
 		glDeleteBuffers(1, &state->buffer);
 	}
+
+	for (size_t i = 0; i < m_textures.size(); ++i)
+	{
+		glDeleteTextures(1, &m_textures[i]);
+	}
 }
 
 GLResult GltfScene::Init(const char* pFileName)
@@ -87,21 +92,88 @@ GLResult GltfScene::Init(const char* pFileName)
 		}
 	}
 
-	glGenVertexArrays(1, &m_vao);
+	if (result == GLResult::Success)
+	{
+		m_textures.reserve(m_model.textures.size());
 
-	//when rendering, iterate nodes and follow references to meshes and such
-	GLuint vs, fs;
+		for (size_t i = 0; i < m_model.textures.size(); ++i)
+		{
+			tinygltf::Texture* texture = &m_model.textures[i];
+			GLuint* textureId = &m_textures[i];
 
-	result = CompileShader(vs_src, GL_VERTEX_SHADER, &vs);
-	result = CompileShader(fs_src, GL_FRAGMENT_SHADER, &fs);
-	result = LinkProgram(vs, fs, &m_program);
+			glGenTextures(1, textureId);
+			glBindTexture(GL_TEXTURE_2D, *textureId);
 
-	glDeleteShader(vs);
-	glDeleteShader(fs);
+			tinygltf::Image* image = &m_model.images[texture->source];
 
-	glBindFragDataLocation(m_program,
-			       0,
-			       "out_color");
+			GLenum format = GL_RGBA;
+			if (image->component == 3) {
+				format = GL_RGB;
+			}
+
+			glTexImage2D(GL_TEXTURE_2D,
+				     0,
+				     format,
+				     image->width,
+				     image->height,
+				     0,
+				     format,
+				     image->pixel_type,
+				     &image->image.at(0));
+
+
+			if (texture->sampler < 0)
+			{
+				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			} else {
+				tinygltf::Sampler* sampler = &m_model.samplers[texture->sampler];
+				glTexParameterf(GL_TEXTURE_2D,
+						GL_TEXTURE_MIN_FILTER,
+						sampler->minFilter);
+				glTexParameterf(GL_TEXTURE_2D,
+						GL_TEXTURE_MAG_FILTER,
+						sampler->magFilter);
+				glTexParameterf(GL_TEXTURE_2D,
+						GL_TEXTURE_WRAP_S,
+						sampler->wrapS);
+				glTexParameterf(GL_TEXTURE_2D,
+						GL_TEXTURE_WRAP_T,
+						sampler->wrapT);
+
+				if ((sampler->minFilter == GL_NEAREST_MIPMAP_NEAREST) ||
+				    (sampler->minFilter == GL_NEAREST_MIPMAP_LINEAR) ||
+				    (sampler->minFilter == GL_LINEAR_MIPMAP_NEAREST) ||
+				    (sampler->minFilter == GL_LINEAR_MIPMAP_LINEAR))
+				{
+					glGenerateMipmap(GL_TEXTURE_2D);		
+				}
+			}
+
+			glBindTexture(GL_TEXTURE_2D, 0);
+		}
+	}
+
+	if (result == GLResult::Success)
+	{
+		glGenVertexArrays(1, &m_vao);
+
+		//when rendering, iterate nodes and follow references to meshes and such
+		GLuint vs, fs;
+
+		result = CompileShader(vs_src, GL_VERTEX_SHADER, &vs);
+		result = CompileShader(fs_src, GL_FRAGMENT_SHADER, &fs);
+		result = LinkProgram(vs, fs, &m_program);
+
+		glDeleteShader(vs);
+		glDeleteShader(fs);
+
+		glBindFragDataLocation(m_program,
+				       0,
+				       "out_color");
+	}
 	
 	return result;
 }
@@ -134,6 +206,17 @@ void GltfScene::DrawMesh(const tinygltf::Mesh* mesh, glm::mat4 transform)
 		fprintf(stderr, "[ERROR] could not get uniform location\n");
 	}
 
+	GLint color_factor_uniform = glGetUniformLocation(m_program, "color_factor");
+	if (world_uniform == -1) {
+		fprintf(stderr, "[ERROR] could not get uniform location\n");
+	}
+
+	GLint color_tex_uniform = glGetUniformLocation(m_program, "color_texture");
+	if (world_uniform == -1) {
+		fprintf(stderr, "[ERROR] could not get uniform location\n");
+	}
+
+
 	glUniformMatrix4fv(world_uniform,
 			   1,
 			   GL_FALSE,
@@ -147,6 +230,42 @@ void GltfScene::DrawMesh(const tinygltf::Mesh* mesh, glm::mat4 transform)
 		// handle material
 		// glUseProgram?
 		// uniforms, textures, samplers?
+		if (primitive->material >= 0)
+		{
+			tinygltf::Material* material = &m_model.materials[primitive->material];
+
+			/* Yay PBR? */
+			if (material->values.find("baseColorFactor") != material->values.end())
+			{
+			} else {
+				glUniform4f(color_factor_uniform,
+					    0., 0., 0., 0.);
+			}
+
+			if (material->values.find("baseColorTexture") != material->values.end())
+			{
+				tinygltf::Parameter* texParam = &material->values["baseColorTexture"];
+
+				int texIdx = texParam->TextureIndex();
+				if (texIdx >= 0 ||
+				    texIdx < m_textures.size())
+				{
+					glActiveTexture(GL_TEXTURE1);
+					glBindTexture(GL_TEXTURE_2D, m_textures[texIdx]);
+					glUniform1i(color_tex_uniform,
+						    1);
+				} else {
+					glUniform1i(color_tex_uniform, 0);
+				}
+
+				//todo tex coord match?
+					
+			} else {
+				glUniform1i(color_tex_uniform,
+					    0);
+			}
+
+		}
 		
 		// handle attributes
 		for (std::map<std::string, int>::const_iterator it = primitive->attributes.begin(); it != primitive->attributes.end(); ++it)
@@ -155,7 +274,7 @@ void GltfScene::DrawMesh(const tinygltf::Mesh* mesh, glm::mat4 transform)
 
 			GLint location = glGetAttribLocation(m_program, attributeName);
 			if (location == -1) {
-				fprintf(stderr, "[WARN] draw has unused attribute: %s\n", attributeName);
+				//fprintf(stderr, "[WARN] draw has unused attribute: %s\n", attributeName);
 				free(attributeName);
 				continue;
 			}
@@ -199,7 +318,60 @@ void GltfScene::DrawMesh(const tinygltf::Mesh* mesh, glm::mat4 transform)
 				       accessor->componentType,
 				       static_cast<void*>(NULL) + accessor->byteOffset);
 		}
-		glBindVertexArray(0);
+		glBindVertexArray(0); 
+	}
+}
+
+void GltfScene::DrawNode(tinygltf::Node* node, glm::mat4 parent_transform)
+{
+	glm::mat4 local_transform = glm::mat4(1.0f);
+	if (node->matrix.size() == 16)
+	{
+		local_transform = glm::make_mat4(node->matrix.data());
+	}
+	else
+	{
+		if (node->scale.size() == 3)
+			local_transform = glm::scale(glm::vec3(
+							     node->scale[0],
+							     node->scale[1],
+							     node->scale[2]))
+				* local_transform;
+		if (node->rotation.size() == 4)
+			local_transform = glm::mat4_cast(glm::quat(node->rotation[3],
+								   node->rotation[0],
+								   node->rotation[1],
+								   node->rotation[2]))
+				* local_transform;
+		if (node->translation.size() == 3)
+			local_transform = glm::translate(
+				glm::vec3(
+					node->translation[0],
+					node->translation[1],
+					node->translation[2])) * local_transform;
+	}
+
+	local_transform = parent_transform * local_transform;
+
+	if (node->mesh >= 0)
+	{
+		tinygltf::Mesh* mesh = &m_model.meshes[node->mesh];
+		DrawMesh(mesh, local_transform);
+	}
+
+	for (size_t i = 0; i < node->children.size(); ++i)
+	{
+		int nodeId = node->children[i];
+		if (nodeId < m_model.nodes.size())
+		{
+			tinygltf::Node* node = &m_model.nodes[nodeId];
+			DrawNode(node, local_transform);
+		}
+		else
+		{
+			fprintf(stderr, "[ERROR] Child ID out of bound %u [bounds %u]",
+				nodeId, m_model.nodes.size());
+		}
 	}
 }
 
@@ -217,10 +389,14 @@ void GltfScene::Render(Camera* pCamera)
 
 	glUseProgram(m_program);
 
-	for (size_t i = 0; i < m_model.meshes.size(); ++i)
+	unsigned int scene = (m_model.defaultScene < 0) ? 0 : m_model.defaultScene;
+
+	if (m_model.scenes.size() >= scene)
 	{
-		tinygltf::Mesh* mesh = &m_model.meshes[i];
-		glm::mat4 model = glm::translate(glm::vec3(0.0f, 0.0f, i * -5.0f));
-		DrawMesh(mesh, view_project * model);
+		for (size_t i = 0; i < m_model.scenes[scene].nodes.size(); ++i)
+		{
+			int nodeId = m_model.scenes[scene].nodes[i];
+			DrawNode(&m_model.nodes[nodeId], view_project);
+		}
 	}
 }
