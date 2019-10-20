@@ -1,18 +1,18 @@
-CXX = g++
-SDL_LIB = -L/usr/lib -lGL -lGLEW -lSDL2 -Wl,-rpath=/usr/lib
-SDL_INCLUDE = -I/usr/include -DGL_GLEXT_PROTOTYPES
+SDL_LIB ?= -L/usr/lib -lGL -lGLEW -lSDL2 -Wl,-rpath=/usr/lib
+SDL_INCLUDE ?= -I/usr/include -DGL_GLEXT_PROTOTYPES
 
-TINY_GLTF_INCLUDE = -Iexternal/tinygltf #-DTINYGLTF_IMPLEMENTATION -DSTB_IMAGE_IMPLEMENTATION -DSTB_IMAGE_WRITE_IMPLEMENTATION
+TINY_GLTF_INCLUDE ?= -Iexternal/tinygltf
 
-CXXFLAGS = -Wall -c -std=c++11 $(SDL_INCLUDE) $(TINY_GLTF_INCLUDE)
-LDFLAGS = $(SDL_LIB)
+CXX ?= g++
+CXXFLAGS ?= -Wall -c -std=c++11 $(SDL_INCLUDE) $(TINY_GLTF_INCLUDE)
+LDFLAGS ?= $(SDL_LIB)
 
 SRC := src
 OBJ := obj
 SOURCES := $(wildcard $(SRC)/*.cpp)
 OBJECTS := $(patsubst $(SRC)/%.cpp, $(OBJ)/%.o, $(SOURCES))
 
-EXE = cube_render
+EXE ?= cube_render
 
 DEBUG ?= 0
 ifeq ($(DEBUG), 1)
