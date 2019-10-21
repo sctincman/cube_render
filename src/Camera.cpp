@@ -20,6 +20,8 @@ Camera::Camera(float width, float height, float fov, float znear, float zfar, fl
 	this->width = width;
 	this->height = height;
 	perspective = glm::perspective(fov, width/height, znear, zfar);
+
+	// special case, breakout into a new class? Cube render should have znear/zfar constrained to cube dims
 	orthographic = glm::ortho(-(width * scale) / height,
 				   (width * scale) / height,
 				   -scale,
@@ -30,6 +32,7 @@ Camera::Camera(float width, float height, float fov, float znear, float zfar, fl
 	vertical = MoveVertical::Not;
 	horizontal = MoveHorizontal::Not;
 	rotate = RotateZ::Not;
+	projection_state = ProjectionState::Not;
 
 	this->persp = true;
 }
@@ -159,6 +162,33 @@ bool Camera::HandleKeys(SDL_KeyboardEvent event) {
 			result = true;
 		}
 		break;
+	case SDLK_MINUS:
+		if (event.state == SDL_PRESSED) {
+			if (projection_state == ProjectionState::Not) {
+				projection_state = ProjectionState::Increase;
+				result = true;
+			}
+		} else {
+			if (projection_state == ProjectionState::Increase) {
+				projection_state = ProjectionState::Not;
+				result = true;
+			}
+		}
+		break;
+	case SDLK_EQUALS:
+		if (event.state == SDL_PRESSED) {
+			if (projection_state == ProjectionState::Not) {
+				projection_state = ProjectionState::Decrease;
+				result = true;
+			}
+		} else {
+			if (projection_state == ProjectionState::Decrease) {
+				projection_state = ProjectionState::Not;
+				result = true;
+			}
+		}
+		break;
+
 	default:
 		result = false;
 		break;
@@ -221,20 +251,28 @@ void Camera::Reproject()
 
 glm::vec3 Camera::Move(glm::vec3 delta)
 {
-	position += delta;
+	this->SetPosition(position + delta);
 	return position;
 }
 
 void Camera::SetPosition(glm::vec3 position)
 {
 	this->position = position;
+	if (targeting) {
+		this->direction = glm::fastNormalize(target - position);
+	}
 }
 
 void Camera::Target(glm::vec3 target, glm::vec3 new_up)
 {
 	this->target = target;
-	this->up = new_up;
-	this->direction = target - position;
+	this->up = glm::fastNormalize(new_up);
+	this->direction = glm::fastNormalize(target - position);
+}
+
+void Camera::Target(glm::vec3 target)
+{
+	this->Target(target, this->up);
 }
 
 void Camera::Step(long delta=16) {
@@ -242,24 +280,23 @@ void Camera::Step(long delta=16) {
 		direction = glm::fastNormalize(target - position);
 	}
 
+	switch (projection_state) {
+	case ProjectionState::Decrease:
+		scale -= (delta * 0.01f);
+		Reproject();
+		break;
+	case ProjectionState::Increase:
+		scale += (delta * 0.01f);
+		Reproject();
+		break;
+	}
+
 	switch (vertical) {
 	case MoveVertical::Up:
-		if (this->persp)
-			position += direction * (delta * 0.01f);
-		else
-		{
-			scale -= (delta * 0.01f);
-			Reproject();
-		}
+		position += direction * (delta * 0.01f);
 		break;
 	case MoveVertical::Down:
-		if (this->persp)
-			position -= direction * (delta * 0.01f);
-		else
-		{
-			scale += (delta * 0.01f);
-			Reproject();
-		}
+		position -= direction * (delta * 0.01f);
 		break;
 	}
 

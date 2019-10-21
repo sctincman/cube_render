@@ -411,11 +411,12 @@ GLResult CubeRenderer::Init()
 	// change to ortho, make one per face
 	pCubeCamera = new Camera(512.0, 512.0,
 				 3.14 / 4.0,
-				 0.1, //these should be 
+				 0.01,
 				 10000.0,
-				 2.0);
+				 10.0);
 
-	pCubeCamera->Move(glm::vec3(0.0, 1.5, 0.0));
+	pCubeCamera->SetPosition(glm::vec3(0.0, 1.5, -1.0));
+	pCubeCamera->Target(glm::vec3(0.f, 1.5f, 1.f));
 	pCubeCamera->SetPerspective(false);
 
 	pAppCamera = new Camera(static_cast<float>(m_width),
@@ -425,6 +426,9 @@ GLResult CubeRenderer::Init()
 				10000.0,
 				1.0);
 	pAppCamera->Move(glm::vec3(2.5, 3.0, 0.0));
+
+	this->pControlCamera = pAppCamera;
+
 	return result;
 }
 
@@ -438,6 +442,7 @@ void CubeRenderer::Resize(uint32_t width, uint32_t height)
 void CubeRenderer::Step(uint32_t stepMs)
 {
 	pAppCamera->Step(stepMs);
+	pCubeCamera->Step(stepMs);
 }
 
 static glm::vec3 up1 = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -445,40 +450,52 @@ static glm::vec3 up2 = glm::vec3(0.0f, 0.0f, 1.0f);
 
 void CubeRenderer::RenderCube(Scene *pTargetScene)
 {
+	glm::vec3 position = pCubeCamera->GetPosition();
+	glm::vec3 target = pCubeCamera->GetTarget();
+	glm::vec3 up = pCubeCamera->GetUp();
+	glm::vec3 direction = pCubeCamera->GetDirection();
+	glm::vec3 right = glm::cross(direction, up);
+	float scale = pCubeCamera->GetScale();
 
 	for (uint8_t i=0; i < NUM_SIDES; ++i)
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, m_fbos[i]);
 		glViewport(0,0,512,512);
-		//move camera
-		// todo, ugh, and I made more complicated with swapping X
+
+		pCubeCamera->Target(position + (direction * scale), up);
+
 		switch(i)
 		{
-		case 0:
-			//should be scale and center
-			pCubeCamera->SetPosition(glm::vec3(-3.0, 1.5f, -5.0f));
-			pCubeCamera->Target(glm::vec3(0.0f, 1.5f, -5.0f), up1);
+		case 0: // -X
+			pCubeCamera->SetPosition(position         +
+						 (right * -scale) +
+						 (direction * scale));
 			break;
-		case 1:
-			pCubeCamera->SetPosition(glm::vec3(3.0, 1.5f, -5.0f));
-			pCubeCamera->Target(glm::vec3(0.0f, 1.5f, -5.0f), up1);
+		case 1: // +X
+			pCubeCamera->SetPosition(position        +
+						 (right * scale) +
+						 (direction * scale));
 			break;
-		case 2:
-			pCubeCamera->SetPosition(glm::vec3(0.0, 4.5f, -5.0f));
-			pCubeCamera->Target(glm::vec3(0.0f, 1.5f, -5.0f), -1.0f * up2);
+		case 2: // +Y
+			pCubeCamera->SetPosition(position     +
+						 (up * scale) +
+						 (direction * scale));
+			pCubeCamera->Target(position + (direction * scale),
+					    direction);
 			break;
-		case 3:
-			pCubeCamera->SetPosition(glm::vec3(0.0, -2.5f, -5.0f));
-			pCubeCamera->Target(glm::vec3(0.0f, 1.5f, -5.0f), up2);
+		case 3: // -Y
+			pCubeCamera->SetPosition(position      +
+						 (up * -scale) +
+						 (direction * scale));
+			pCubeCamera->Target(position + (direction * scale),
+					    -direction);
 			break;
-		case 4:
-			//should be scale and center
-			pCubeCamera->SetPosition(glm::vec3(0.0, 1.5f, -2.0f));
-			pCubeCamera->Target(glm::vec3(0.0f, 1.5f, -5.0f), up1);
+		case 4: // +Z
+			pCubeCamera->SetPosition(position);
 			break;
-		case 5:
-			pCubeCamera->SetPosition(glm::vec3(0.0, 1.5f, -8.0f));
-			pCubeCamera->Target(glm::vec3(0.0f, 1.5f, -5.0f), up1);
+		case 5: // -Z
+			pCubeCamera->SetPosition(position +
+						 (direction * 2.f * scale));
 			break;
 
 		}
@@ -486,6 +503,9 @@ void CubeRenderer::RenderCube(Scene *pTargetScene)
 		pTargetScene->Render(pCubeCamera);
 	}
 
+	//restore... okay this really needs to move once working
+	pCubeCamera->SetPosition(position);
+	pCubeCamera->Target(target, up);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	// resize...
@@ -530,7 +550,7 @@ void CubeRenderer::RenderScene(Scene *pTargetScene)
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	// resize...
 	glViewport(0,0,m_width,m_height);
-        pTargetScene->Render(pAppCamera);
+        pTargetScene->Render(pCubeCamera);
 }
 
 void CubeRenderer::Render(Scene *pTargetScene)
@@ -552,11 +572,17 @@ bool CubeRenderer::HandleInputEvent(SDL_Event event)
 			this->bRenderCube = !this->bRenderCube;
 			result = true;
 			break;
+		case SDLK_c:
+			if (this->pControlCamera == this->pAppCamera)
+				this->pControlCamera = this->pCubeCamera;
+			else
+				this->pControlCamera = this->pAppCamera;
+			break;
 		}
 	}
 
 	if (result == false)
-		result = pAppCamera->HandleInputEvent(event);
+		result = this->pControlCamera->HandleInputEvent(event);
 
 	return result;
 }

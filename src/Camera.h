@@ -24,6 +24,12 @@ enum class RotateZ {
 	Right,
 };
 
+enum class ProjectionState {
+	Not = 0,
+	Increase,
+	Decrease,
+};
+
 class Camera {
 private:
 	glm::vec3 position;
@@ -46,6 +52,7 @@ private:
 	MoveVertical vertical;
 	MoveHorizontal horizontal;
 	RotateZ rotate;
+	ProjectionState projection_state;
 public:
 	Camera(float width, float height, float fov, float znear, float zfar, float scale);
 	glm::mat4 View();
@@ -54,11 +61,17 @@ public:
 	void Rotate(float delta_x, float delta_y);
 	void Resize(float width, float height);
 	void Reproject();
-	glm::vec3 GetPosition() { return position;}
 	glm::vec3 Move(glm::vec3 delta);
 	void SetPosition(glm::vec3 position);
 	void Target(glm::vec3 target);
 	void Target(glm::vec3 target, glm::vec3 new_up);
+
+	// hmmmm, maybe a special camera is in order?
+	glm::vec3 GetPosition() const { return position; }
+	float GetScale() const { return scale; }
+	glm::vec3 GetTarget() const { return target; }
+	glm::vec3 GetDirection() const { return direction; }
+	glm::vec3 GetUp() const { return up; }
 
 	bool HandleInputEvent(SDL_Event event);
 	void Step(long delta);

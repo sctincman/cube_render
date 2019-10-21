@@ -45,6 +45,7 @@ private:
 
 	Camera *pCubeCamera;
 	Camera *pAppCamera;
+	Camera *pControlCamera;
 };
 
 #endif // CUBE_RENDERER_H
